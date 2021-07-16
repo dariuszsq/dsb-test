@@ -1,0 +1,6 @@
+# DEPLOY_NAMESPACE = fetcherr-test
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dsb-test

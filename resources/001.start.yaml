@@ -1,0 +1,24 @@
+resources:
+
+- name: test-cluster
+  type: container.v1.cluster
+  properties:
+    zone: "us-central1-c"
+    cluster:
+      location: "us-central1"
+      network: "gke-common-vpc"
+      subnetwork: "gke-common-subnet"
+      initialClusterVersion: "1.19.9-gke.1900"
+      currentMasterVersion: "1.19.9-gke.1900"
+      nodePools:
+      - name: "default-pool"
+        initialNodeCount: 2
+        version: "1.19.9-gke.190"
+        config:
+          machineType: "n1-standard-2"
+          oauthScopes:
+            - https://www.googleapis.com/auth/logging.write
+            - https://www.googleapis.com/auth/monitoring
+            - https://www.googleapis.com/auth/ndev.clouddns.readwrite
+          preemptible: true
+

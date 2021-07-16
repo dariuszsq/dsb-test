@@ -1,0 +1,131 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: sysctl-psp
+  namespace: dsb-test
+spec:
+  allowedUnsafeSysctls:
+  - net.ipv4.tcp_congestion_control
+  fsGroup:
+    rule: RunAsAny
+  runAsUser:
+    rule: MustRunAs
+    ranges:
+    - min: 0
+      max: 0
+    - min: 1337
+      max: 1337
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: my-clusterrole
+  namespace: dsb-test
+rules:
+- apiGroups:
+  - policy
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+  resourceNames:
+  - my-psp
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: my-rolebinding
+  namespace: dsb-test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: my-clusterrole
+subjects:
+# Example: All service accounts in my-namespace
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:serviceaccounts
+# Example: A specific service account in my-namespace
+- kind: ServiceAccount # Omit apiGroup
+  name: default
+  namespace: dsb-test
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fetcher-test
+  namespace: dsb-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fetcher-test
+  template:
+    metadata:
+      labels:
+        app: fetcher-test
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - store
+            topologyKey: "kubernetes.io/hostname"
+      securityContext:
+        sysctls:
+        - name: net.ipv4.tcp_congestion_control
+          value: "bbr"
+      containers:
+      - name: fetcher-test
+        image: argoproj/rollouts-demo:blue
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fetcher-test-service
+  namespace: dsb-test
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  type: ClusterIP
+  selector:
+    run: fetcher-test
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fetcher-test-ingress
+  namespace: dsb-test
+spec:
+  defaultBackend:
+    service:
+      name: fetcher-test-service
+      port:
+        number: 80

@@ -1,0 +1,1 @@
+gcloud deployment-manager deployments update k8s-conf-mgmt --config resources/001.start.yam
